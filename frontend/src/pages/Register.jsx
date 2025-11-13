@@ -1,13 +1,55 @@
 /**
  * Register Page
- * New user registration with profile setup
+ * New user registration with profile setup + Firestore ChatBot doc creation
  */
 
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { User, Mail, Lock, ArrowRight, GraduationCap, Briefcase, Target, LogOut } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
+import {
+  User,
+  Mail,
+  Lock,
+  ArrowRight,
+  GraduationCap,
+  Briefcase,
+  Target,
+  LogOut,
+} from 'lucide-react';
+
+// 🔥 Firebase imports
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  updateProfile,
+  signOut,
+} from 'firebase/auth';
+
+// 🔥 Firestore imports
+import {
+  getFirestore,
+  doc,
+  setDoc,
+  serverTimestamp,
+} from 'firebase/firestore';
+
+// 🔥 Your Firebase config
+const firebaseConfig = {
+  apiKey: 'AIzaSyC8za3ZI4m9gUrYsueUum907vpuKzV8H0Q',
+  authDomain: 'iiuc25.firebaseapp.com',
+  projectId: 'iiuc25',
+  storageBucket: 'iiuc25.firebasestorage.app',
+  messagingSenderId: '75690391713',
+  appId: '1:75690391713:web:4c72c5316547c8bc68d8e0',
+  measurementId: 'G-82V42TWJ9J',
+};
+
+// 🔥 Initialize Firebase app & services (safe for hot reloads)
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const auth = getAuth(app);
+const db = getFirestore(app);
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -19,54 +61,98 @@ const Register = () => {
     careerTrack: 'Web Development',
   });
   const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
-  const { currentUser, signup, logout, signInWithGoogle } = useAuth();
 
+  // Listen for auth state changes (logged-in user)
   useEffect(() => {
-    if (currentUser) navigate('/dashboard');
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Optional: redirect if already logged in from before
+  useEffect(() => {
+    if (currentUser) {
+      console.log('Auth state changed, currentUser:', currentUser.email);
+      // If you think this might be redirecting too early, you can comment this out:
+      // navigate('/dashboard');
+    }
   }, [currentUser, navigate]);
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    setError('');
+
     // Basic validation
     if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long.');
       return;
     }
 
     setLoading(true);
     try {
-      await signup(formData.email, formData.password, formData.name);
-      // Redirect to dashboard instead of home
+      console.log('Starting signup for:', formData.email);
+
+      // 1️⃣ Create user with email & password
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        formData.password
+      );
+      console.log('User created:', userCredential.user.email);
+
+      // 2️⃣ Set display name
+      if (formData.name) {
+        await updateProfile(userCredential.user, {
+          displayName: formData.name,
+        });
+        console.log('Display name updated to:', formData.name);
+      }
+
+      // 3️⃣ Create Firestore document in collection "ChatBot" with doc ID = email
+      const docRef = doc(db, 'ChatBot', formData.email);
+      console.log('Writing Firestore doc at ChatBot/' + formData.email);
+
+      await setDoc(
+        docRef,
+        {
+          email: formData.email,
+          name: formData.name,
+          education: formData.education,
+          experienceLevel: formData.experienceLevel,
+          careerTrack: formData.careerTrack,
+          createdAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      console.log('ChatBot document successfully created for:', formData.email);
+
+      // 4️⃣ Redirect to dashboard
       navigate('/dashboard');
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error('Registration / Firestore error:', error);
+      setError(error.message || 'Failed to register. Please try again.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleLogout = async () => {
     try {
-      await logout();
+      await signOut(auth);
       navigate('/');
     } catch (error) {
       console.error('Logout error:', error);
     }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    try {
-      await signInWithGoogle();
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Google sign-in error:', error);
-    }
-    setLoading(false);
   };
 
   const educationOptions = ['High School', 'Undergraduate', 'Graduate', 'Postgraduate', 'Other'];
@@ -116,7 +202,7 @@ const Register = () => {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-white">
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-bg-muted dark:bg-gray-900">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -125,13 +211,20 @@ const Register = () => {
       >
         {/* Header */}
         <div className="text-center mb-8">
-          <h2 className="font-heading text-3xl font-bold mb-2 text-gray-900">Start Your Journey</h2>
-          <p className="text-gray-600">Create your CareerPath account and discover opportunities</p>
+          <h2 className="font-heading text-3xl font-bold mb-2">Start Your Journey</h2>
+          <p className="text-text-muted">Create your CareerPath account and discover opportunities</p>
         </div>
 
         {/* Registration Form */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+        <div className="card p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Error message */}
+            {error && (
+              <div className="p-3 rounded-md bg-red-100 text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
             {/* Basic Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Name */}
@@ -284,32 +377,6 @@ const Register = () => {
               )}
             </button>
           </form>
-
-          {/* Google Sign In */}
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or continue with</span>
-              </div>
-            </div>
-
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-              className="mt-3 w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Sign up with Google
-            </button>
-          </div>
 
           {/* Divider */}
           <div className="mt-6 text-center">

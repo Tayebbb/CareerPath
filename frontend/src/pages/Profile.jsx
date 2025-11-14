@@ -23,12 +23,14 @@ const Profile = () => {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [skillInput, setSkillInput] = useState('');
+  const [toolInput, setToolInput] = useState('');
   const [skillSuggestions, setSkillSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [profileCompletion, setProfileCompletion] = useState(0);
   const [formData, setFormData] = useState({
     bio: '',
     skills: [],
+    tools: [],
     experienceLevel: '',
     preferredTrack: '',
     location: '',
@@ -58,6 +60,7 @@ const Profile = () => {
       setFormData({
         bio: userData.bio || '',
         skills: userData.skills || [],
+        tools: userData.tools || [],
         experienceLevel: userData.experienceLevel || '',
         preferredTrack: userData.preferredTrack || '',
         location: userData.location || '',
@@ -80,9 +83,10 @@ const Profile = () => {
   const calculateCompletion = (data) => {
     const fields = [
       { key: 'bio', weight: 10 },
-      { key: 'skills', weight: 30, check: (val) => val && val.length > 0 },
-      { key: 'experienceLevel', weight: 20 },
-      { key: 'preferredTrack', weight: 20 },
+      { key: 'skills', weight: 20, check: (val) => val && val.length > 0 },
+      { key: 'tools', weight: 20, check: (val) => val && val.length > 0 },
+      { key: 'experienceLevel', weight: 15 },
+      { key: 'preferredTrack', weight: 15 },
       { key: 'location', weight: 10 },
       { key: 'education', weight: 10 }
     ];
@@ -106,6 +110,10 @@ const Profile = () => {
     // Validate mandatory fields
     if (!updatedData.skills || updatedData.skills.length === 0) {
       toast.error('Please add at least one skill');
+      return;
+    }
+    if (!updatedData.tools || updatedData.tools.length === 0) {
+      toast.error('Please add at least one tool/technology');
       return;
     }
     if (!updatedData.experienceLevel) {
@@ -349,6 +357,68 @@ const Profile = () => {
                 )}
               </div>
 
+              {/* Tools/Technologies - MANDATORY */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Tools/Technologies <span className="text-red-400">*</span>
+                </label>
+                <p className="text-xs text-muted mb-2">Add tools and technologies you work with (e.g., VS Code, Git, Docker, Jenkins)</p>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={toolInput}
+                    onChange={(e) => setToolInput(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const value = toolInput.trim();
+                        if (value && !formData.tools.includes(value)) {
+                          setFormData(prev => ({ ...prev, tools: [...prev.tools, value] }));
+                          setToolInput('');
+                        }
+                      }
+                    }}
+                    className="input-field flex-1"
+                    placeholder="VS Code, Git, Docker, Jenkins..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const value = toolInput.trim();
+                      if (value && !formData.tools.includes(value)) {
+                        setFormData(prev => ({ ...prev, tools: [...prev.tools, value] }));
+                        setToolInput('');
+                      }
+                    }}
+                    className="btn-primary px-6"
+                  >
+                    Add
+                  </button>
+                </div>
+                {formData.tools.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.tools.map((tool, idx) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1 bg-purple-500/20 border border-purple-400/40 rounded-full text-sm text-purple-300 flex items-center gap-2"
+                      >
+                        {tool}
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, tools: prev.tools.filter(t => t !== tool) }))}
+                          className="hover:text-red-400 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {formData.tools.length === 0 && (
+                  <p className="text-xs text-red-400">Please add at least one tool/technology</p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Experience Level - MANDATORY */}
                 <div>
@@ -488,6 +558,26 @@ const Profile = () => {
                       ))
                     ) : (
                       <p className="text-red-400">No skills added - Required!</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <h4 className="text-sm font-semibold mb-2 text-muted">
+                    Tools/Technologies {(!profile?.tools || profile.tools.length === 0) && <span className="text-red-400">*</span>}
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {profile?.tools?.length > 0 ? (
+                      profile.tools.map((tool, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 bg-purple-500/20 border border-purple-400/40 text-purple-300 rounded-full text-sm"
+                        >
+                          {tool}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-red-400">No tools/technologies added - Required!</p>
                     )}
                   </div>
                 </div>

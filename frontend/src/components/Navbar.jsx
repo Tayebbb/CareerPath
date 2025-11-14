@@ -92,12 +92,12 @@ const Navbar = () => {
             <Link to="/" className="flex items-center space-x-2 group">
               <div className="relative">
                 <div className="w-10 h-10 bg-gradient-to-br from-emerald-400 to-green-600 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-emerald-200 transition-shadow duration-300">
-                  <span className="text-white font-bold text-lg">C</span>
+                  <span className="text-white font-bold text-lg">প</span>
                 </div>
                 <div className="absolute -inset-1 bg-gradient-to-r from-emerald-400 to-green-600 rounded-xl blur opacity-30 group-hover:opacity-60 transition-opacity"></div>
               </div>
               <span className="text-2xl font-bold bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent">
-                CareerPath
+                পথচলা
               </span>
             </Link>
           </motion.div>

@@ -268,7 +268,7 @@ const Register = () => {
         {/* Header */}
         <div className="text-center mb-8">
           <h2 className="font-heading text-3xl font-bold mb-2">Start Your Journey</h2>
-          <p className="text-text-muted">Create your CareerPath account and discover opportunities</p>
+          <p className="text-text-muted">Create your পথচলা account and discover opportunities</p>
         </div>
 
         {/* Registration Form */}

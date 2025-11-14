@@ -243,7 +243,7 @@ const FeatureReveal = () => {
             className="text-xl text-gray-600 max-w-3xl mx-auto reveal"
             ref={el => headingsRef.current[1] = el}
           >
-            Discover how CareerPath empowers professionals with cutting-edge tools and insights
+            Discover how পথচলা empowers professionals with cutting-edge tools and insights
           </p>
         </div>
 

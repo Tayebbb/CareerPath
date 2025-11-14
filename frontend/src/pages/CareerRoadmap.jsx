@@ -391,26 +391,32 @@ Format clearly with headers and bullet points.`;
               {roadmap.content.split('\n').map((line, idx) => {
                 if (line.trim() === '') return null;
                 
-                if (line.includes('**') || line.match(/^\d+\./)) {
+                // Clean up line by removing markdown formatting
+                const cleanLine = line.replace(/\*\*/g, '');
+                
+                // Only top-level section headers (e.g., "1. Introduction:", "2. Current State:", etc.)
+                // These are lines that match pattern: number followed by period and text with colon
+                if (cleanLine.match(/^\d+\.\s+[A-Z][^:]*:$/)) {
                   return (
                     <h3 key={idx} style={styles.roadmapSectionTitle}>
-                      {line.replace(/\*\*/g, '')}
+                      {cleanLine}
                     </h3>
                   );
                 }
                 
-                if (line.startsWith('-') || line.startsWith('•')) {
+                // Sub-steps starting with * or - or numbered sub-steps - all white
+                if (line.startsWith('*') || line.startsWith('-') || line.startsWith('•')) {
                   return (
                     <div key={idx} style={styles.bulletPoint}>
-                      <ArrowRight size={16} style={{ color: '#A855F7', marginRight: '8px', flexShrink: 0 }} />
-                      <span>{line.replace(/^[-•]\s*/, '')}</span>
+                      <ArrowRight size={18} style={{ color: '#FFFFFF', marginRight: '8px', flexShrink: 0, marginTop: '2px' }} />
+                      <span>{cleanLine.replace(/^[*\-•]\s*/, '')}</span>
                     </div>
                   );
                 }
 
                 return (
                   <p key={idx} style={styles.roadmapText}>
-                    {line}
+                    {cleanLine}
                   </p>
                 );
               })}
@@ -634,86 +640,107 @@ const styles = {
     margin: 0,
   },
   roadmapHeader: {
-    padding: '24px',
-    background: 'linear-gradient(135deg, rgba(168,85,247,0.1), rgba(213,0,249,0.05))',
-    borderRadius: '16px',
-    border: '1px solid rgba(168,85,247,0.15)',
+    padding: '32px',
+    background: 'linear-gradient(135deg, rgba(168,85,247,0.2), rgba(213,0,249,0.1))',
+    borderRadius: '20px',
+    border: '1px solid rgba(168,85,247,0.3)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
+    boxShadow: '0 8px 24px rgba(168,85,247,0.15)',
   },
   roadmapTitle: {
     color: '#FFFFFF',
-    fontSize: '24px',
-    fontWeight: '700',
-    margin: '0 0 8px 0',
-    background: 'linear-gradient(90deg, #A855F7, #D500F9)',
+    fontSize: '32px',
+    fontWeight: '800',
+    margin: '0 0 12px 0',
+    background: 'linear-gradient(135deg, #E879F9, #A855F7, #D500F9)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
     backgroundClip: 'text',
+    textShadow: '0 0 30px rgba(168,85,247,0.3)',
+    letterSpacing: '-0.5px',
   },
   roadmapSubtitle: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: '14px',
+    color: '#D1D5DB',
+    fontSize: '16px',
     margin: 0,
+    fontWeight: '500',
   },
   roadmapContent: {
-    padding: '24px',
-    background: 'rgba(17,21,43,0.4)',
+    padding: '32px',
+    background: 'linear-gradient(135deg, rgba(17,21,43,0.8), rgba(11,14,28,0.9))',
     borderRadius: '16px',
-    border: '1px solid rgba(168,85,247,0.08)',
+    border: '1px solid rgba(168,85,247,0.2)',
+    boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '20px',
   },
   roadmapSectionTitle: {
-    color: '#A855F7',
-    fontSize: '16px',
-    fontWeight: '600',
-    margin: '8px 0 12px 0',
-    textTransform: 'uppercase',
+    color: '#FFFFFF',
+    fontSize: '20px',
+    fontWeight: '800',
+    margin: '24px 0 16px 0',
+    textTransform: 'none',
     letterSpacing: '0.5px',
+    background: 'linear-gradient(135deg, #FBBF24, #F59E0B, #EF4444)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+    borderBottom: '3px solid rgba(251,191,36,0.4)',
+    paddingBottom: '12px',
+    textShadow: '0 0 20px rgba(251,191,36,0.3)',
   },
   bulletPoint: {
     display: 'flex',
     alignItems: 'flex-start',
     gap: '12px',
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: '14px',
-    lineHeight: '1.6',
-    padding: '8px 0',
+    color: '#FFFFFF',
+    fontSize: '15px',
+    lineHeight: '1.8',
+    padding: '14px 20px',
+    background: 'rgba(168,85,247,0.08)',
+    borderRadius: '10px',
+    borderLeft: '4px solid #A855F7',
+    transition: 'all 0.2s ease',
+    fontWeight: '500',
   },
   roadmapText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: '14px',
-    lineHeight: '1.6',
-    margin: '8px 0',
+    color: '#FFFFFF',
+    fontSize: '15px',
+    lineHeight: '1.8',
+    margin: '12px 0',
+    fontWeight: '400',
   },
   actionButtons: {
     display: 'flex',
-    gap: '12px',
+    gap: '16px',
     justifyContent: 'center',
     flexWrap: 'wrap',
+    marginTop: '24px',
   },
   primaryButton: {
-    padding: '12px 24px',
+    padding: '14px 32px',
     background: 'linear-gradient(135deg, #A855F7, #7C3AED)',
     color: '#FFFFFF',
     border: 'none',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
+    borderRadius: '12px',
+    fontSize: '15px',
+    fontWeight: '700',
     cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(168,85,247,0.3)',
+    boxShadow: '0 6px 20px rgba(168,85,247,0.4)',
+    transition: 'all 0.3s ease',
   },
   secondaryButton: {
-    padding: '12px 24px',
-    background: 'transparent',
-    color: '#A855F7',
-    border: '1px solid rgba(168,85,247,0.3)',
-    borderRadius: '8px',
-    fontSize: '14px',
-    fontWeight: '600',
+    padding: '14px 32px',
+    background: 'rgba(168,85,247,0.1)',
+    color: '#E879F9',
+    border: '2px solid rgba(168,85,247,0.4)',
+    borderRadius: '12px',
+    fontSize: '15px',
+    fontWeight: '700',
     cursor: 'pointer',
+    transition: 'all 0.3s ease',
   },
 };

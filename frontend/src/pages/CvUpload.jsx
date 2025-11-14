@@ -53,64 +53,33 @@ Respond in EXACTLY 2 lines. Each line should have one skill with a brief reason.
 Format: "Skill Name - Why it's important for their profile"
 Keep it SHORT and concise.`;
 
-      // Retry logic with exponential backoff
-      let retries = 3;
-      let lastError = null;
-
-      while (retries > 0) {
-        try {
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                contents: [
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
                   {
-                    parts: [
-                      {
-                        text: prompt,
-                      },
-                    ],
+                    text: prompt,
                   },
                 ],
-              }),
-            }
-          );
-
-          if (response.ok) {
-            const data = await response.json();
-            const suggestion = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (suggestion) {
-              setSkillsSuggestion(suggestion);
-              return;
-            }
-          } else if (response.status === 429) {
-            // Rate limited - wait and retry
-            lastError = "API rate limited. Retrying...";
-            retries--;
-            if (retries > 0) {
-              await new Promise(resolve => setTimeout(resolve, 2000 * (4 - retries))); // Exponential backoff
-              continue;
-            }
-          } else {
-            lastError = `API error: ${response.status}`;
-            break;
-          }
-        } catch (err) {
-          lastError = err.message;
-          retries--;
-          if (retries > 0) {
-            await new Promise(resolve => setTimeout(resolve, 2000 * (4 - retries)));
-            continue;
-          }
+              },
+            ],
+          }),
         }
-      }
+      );
 
-      if (lastError) {
-        console.warn("Could not get skills suggestion:", lastError);
+      if (response.ok) {
+        const data = await response.json();
+        const suggestion = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (suggestion) {
+          setSkillsSuggestion(suggestion);
+        }
       }
     } catch (err) {
       console.error("Error getting Gemini suggestion:", err);

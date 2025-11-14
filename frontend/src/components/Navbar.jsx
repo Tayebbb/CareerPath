@@ -6,13 +6,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, User, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, X, User, LogOut, ChevronDown, Sparkles } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showAIMenu, setShowAIMenu] = useState(false);
   const location = useLocation();
   const { currentUser, logout } = useAuth();
 
@@ -35,12 +36,16 @@ const Navbar = () => {
   };
 
   const navLinks = [
+    { name: 'Dashboard', href: '/dashboard' },
     { name: 'Jobs', href: '/jobs' },
     { name: 'Resources', href: '/resources' },
-    { name: 'AI Assistance', href: '/chatassistance' },
-    { name: 'CV Upload', href: '/cv-upload' },
-    { name: 'Career Roadmap', href: '/career-roadmap' },
     { name: 'Contact', href: '/contact' },
+  ];
+
+  const aiFeatures = [
+    { name: 'AI Assistance', href: '/chatassistance', icon: '💬' },
+    { name: 'CV Upload', href: '/cv-upload', icon: '📄' },
+    { name: 'Career Roadmap', href: '/career-roadmap', icon: '🗺️' },
   ];
 
   const publicNavLinks = [
@@ -50,9 +55,7 @@ const Navbar = () => {
     { name: 'Contact', href: '/contact' },
   ];
 
-  const userNavLinks = [
-    { name: 'Dashboard', href: '/dashboard' },
-  ];
+  const userNavLinks = [];
 
   const navVariants = {
     initial: { y: -100 },
@@ -78,12 +81,14 @@ const Navbar = () => {
       variants={navVariants}
       initial="initial"
       animate="animate"
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
-          ? 'bg-[#0B0E1C]/95 backdrop-blur-md shadow-neon-soft py-2'
-          : 'bg-[#0B0E1C]/90 backdrop-blur-sm py-4'
-      }`}
-      style={{borderBottom: isScrolled ? '1px solid rgba(168,85,247,0.08)' : 'none'}}
+      className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+      style={{
+        background: `linear-gradient(90deg, rgba(168, 85, 247, ${Math.max(0.15, Math.min(scrollY / 300, 0.5))}), rgba(212, 0, 249, ${Math.max(0.1, Math.min(scrollY / 300, 0.4))})), rgba(11, 14, 28, ${Math.max(0.2, Math.min(scrollY / 200, 0.6))})`,
+        backdropFilter: `blur(${Math.min(scrollY / 5, 90)}px)`,
+        borderBottom: scrollY > 20 ? '1px solid rgba(168,85,247,0.2)' : 'none',
+        paddingTop: scrollY > 50 ? '0.5rem' : '1rem',
+        paddingBottom: scrollY > 50 ? '0.5rem' : '1rem',
+      }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
@@ -139,28 +144,72 @@ const Navbar = () => {
               </motion.div>
             ))}
 
-            {currentUser && userNavLinks.map((link, index) => (
-              <motion.div key={link.name} whileHover={{ y: -2 }}>
-                <Link
-                  to={link.href}
-                  className={`cursor-hover relative px-4 py-2 rounded-lg font-medium transition-all duration-200 group ${
-                    location.pathname === link.href
-                      ? 'text-primary'
-                      : 'text-muted hover:text-primary'
-                  }`}
+            {/* AI Features Dropdown */}
+            {currentUser && (
+              <div className="relative group">
+                <motion.button
+                  whileHover={{ y: -2 }}
+                  onMouseEnter={() => setShowAIMenu(true)}
+                  onMouseLeave={() => setShowAIMenu(false)}
+                  className="cursor-hover relative px-4 py-2 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 text-muted hover:text-primary"
                 >
-                  <span className="relative z-10">{link.name}</span>
+                  <Sparkles size={18} />
+                  <span className="relative z-10">AI Tools</span>
+                  <ChevronDown size={16} className={`transition-transform duration-300 ${showAIMenu ? 'rotate-180' : ''}`} />
                   <div
                     className={`absolute inset-0 rounded-lg transition-all duration-200 ${
-                      location.pathname === link.href
+                      showAIMenu
                         ? 'opacity-100 scale-100'
                         : 'opacity-0 scale-95 group-hover:opacity-100 group-hover:scale-100'
                     }`}
                     style={{background: 'rgba(168,85,247,0.06)'}}
                   />
-                </Link>
-              </motion.div>
-            ))}
+                  <div
+                    className={`absolute bottom-0 left-1/2 h-0.5 transition-all duration-200 ${
+                      showAIMenu
+                        ? 'w-3/4 -translate-x-1/2'
+                        : 'w-0 -translate-x-1/2 group-hover:w-1/2'
+                    }`}
+                    style={{background: 'linear-gradient(90deg,#A855F7,#D500F9)'}}
+                  />
+                </motion.button>
+
+                {/* AI Dropdown Menu */}
+                <AnimatePresence>
+                  {showAIMenu && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      onMouseEnter={() => setShowAIMenu(true)}
+                      onMouseLeave={() => setShowAIMenu(false)}
+                      className="absolute top-full left-0 mt-2 w-56 rounded-xl shadow-xl border py-2 z-50 neon-card"
+                      style={{background:'#11152B', borderColor:'rgba(168,85,247,0.12)'}}
+                    >
+                      {aiFeatures.map((feature, index) => (
+                        <Link
+                          key={feature.name}
+                          to={feature.href}
+                          onClick={() => setShowAIMenu(false)}
+                          className="flex items-center gap-3 px-4 py-3 hover:bg-[rgba(168,85,247,0.08)] transition-all duration-150 group"
+                        >
+                          <span className="text-xl">{feature.icon}</span>
+                          <div className="flex-1">
+                            <p className="text-sm font-medium" style={{color:'#FFFFFF'}}>{feature.name}</p>
+                            <p className="text-xs text-muted">
+                              {feature.name === 'AI Assistance' && 'Get AI help'}
+                              {feature.name === 'CV Upload' && 'Analyze your CV'}
+                              {feature.name === 'Career Roadmap' && 'Plan your career'}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
 
           {/* Desktop Auth Buttons */}

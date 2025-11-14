@@ -39,6 +39,7 @@ const CourseResources = () => {
   const iconRef = useRef(null);
   const titleRef = useRef(null);
   const subtitleRef = useRef(null);
+  const cardRefs = useRef([]);
 
   // GSAP 3D Header Animation
   useEffect(() => {
@@ -114,6 +115,93 @@ const CourseResources = () => {
 
     return () => ctx.revert();
   }, []);
+
+  // GSAP 3D Grid Animation
+  useEffect(() => {
+    if (cardRefs.current.length > 0) {
+      const ctx = gsap.context(() => {
+        cardRefs.current.forEach((card, index) => {
+          if (card) {
+            // Initial 3D entrance animation
+            gsap.from(card, {
+              duration: 0.8,
+              opacity: 0,
+              scale: 0.5,
+              rotationY: -90,
+              z: -200,
+              ease: "back.out(1.7)",
+              delay: index * 0.1,
+              transformPerspective: 1000,
+              transformOrigin: "center center",
+              scrollTrigger: {
+                trigger: card,
+                start: "top 85%",
+                toggleActions: "play none none none"
+              }
+            });
+
+            // 3D hover effect
+            const handleMouseEnter = (e) => {
+              gsap.to(card, {
+                duration: 0.4,
+                scale: 1.05,
+                z: 50,
+                rotationX: 5,
+                rotationY: 5,
+                ease: "power2.out",
+                transformPerspective: 1000,
+                boxShadow: "0 20px 60px rgba(168, 85, 247, 0.4)"
+              });
+            };
+
+            const handleMouseMove = (e) => {
+              const rect = card.getBoundingClientRect();
+              const x = e.clientX - rect.left;
+              const y = e.clientY - rect.top;
+              const centerX = rect.width / 2;
+              const centerY = rect.height / 2;
+              
+              const rotateX = (y - centerY) / 10;
+              const rotateY = (centerX - x) / 10;
+
+              gsap.to(card, {
+                duration: 0.3,
+                rotationX: rotateX,
+                rotationY: rotateY,
+                ease: "power2.out",
+                transformPerspective: 1000
+              });
+            };
+
+            const handleMouseLeave = () => {
+              gsap.to(card, {
+                duration: 0.4,
+                scale: 1,
+                z: 0,
+                rotationX: 0,
+                rotationY: 0,
+                ease: "power2.out",
+                transformPerspective: 1000,
+                boxShadow: "0 10px 30px rgba(0, 0, 0, 0.2)"
+              });
+            };
+
+            card.addEventListener('mouseenter', handleMouseEnter);
+            card.addEventListener('mousemove', handleMouseMove);
+            card.addEventListener('mouseleave', handleMouseLeave);
+
+            return () => {
+              card.removeEventListener('mouseenter', handleMouseEnter);
+              card.removeEventListener('mousemove', handleMouseMove);
+              card.removeEventListener('mouseleave', handleMouseLeave);
+            };
+          }
+        });
+      });
+
+      return () => ctx.revert();
+    }
+  }, [filteredCourses]);
 
   // Monitor authentication state
   useEffect(() => {

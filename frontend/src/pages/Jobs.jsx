@@ -470,7 +470,7 @@ const Jobs = () => {
                   <p className="text-white font-semibold mb-1">Complete your profile to see personalized job matches!</p>
                   <p className="text-white/80 text-sm">Add your skills, experience level, and preferred career track in your profile.</p>
                 </div>
-                <a href="/profile" className="btn-outline-neon whitespace-nowrap">
+                <a href="/profile" className="bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 font-semibold px-6 py-2 rounded-lg hover:from-yellow-500 hover:to-orange-600 transition-all shadow-lg whitespace-nowrap">
                   Update Profile
                 </a>
               </div>

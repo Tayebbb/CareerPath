@@ -24,7 +24,14 @@ const Login = () => {
 
   // Redirect if already logged in
   useEffect(() => {
-    if (currentUser) navigate('/dashboard');
+    if (currentUser) {
+      // Check if admin and redirect accordingly
+      if (currentUser.email === ADMIN_EMAIL) {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
+    }
   }, [currentUser, navigate]);
 
   const handleSubmit = async (e) => {

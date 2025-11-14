@@ -26,7 +26,6 @@ import Signup from "./pages/Signup";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import Dashboard from "./pages/Dashboard";
-import ChatBot from './pages/ChatBot';
 
 function AppContent() {
   const location = useLocation();
@@ -43,8 +42,8 @@ function AppContent() {
             {/* Redirect authenticated users from home to dashboard */}
             <Route path="/" element={currentUser ? <Navigate to="/dashboard" replace /> : <Home />} />
             <Route path="/jobs" element={<Jobs />} />
-            <Route path="/jobs/:id" element={<JobDetails />} />
             <Route path="/jobs/match" element={<ProtectedRoute><JobMatchPage /></ProtectedRoute>} />
+            <Route path="/jobs/:id" element={<JobDetails />} />
             <Route path="/resources" element={<Resources />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/login" element={<Login />} />
@@ -52,7 +51,6 @@ function AppContent() {
             <Route path="/signup" element={<Register />} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/chatbot" element={<ChatBot />} />
           </Routes>
         </AnimatePresence>
       </div>

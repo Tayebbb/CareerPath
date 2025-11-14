@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, MapPin, Briefcase, DollarSign, Building2, Clock, TrendingUp, X, ExternalLink, Users, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, MapPin, Briefcase, DollarSign, Building2, Clock, TrendingUp, X, ExternalLink, Users, CheckCircle, AlertCircle, Target, Award, Zap } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, getDocs, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { calculateMatchScore, getMatchLevel } from '../utils/matchScore';
 
 // Firebase Configuration
 const firebaseConfig = {
@@ -30,6 +31,9 @@ const Jobs = () => {
   const [currentUser, setCurrentUser] = useState(null);
   const [applying, setApplying] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const [topMatches, setTopMatches] = useState([]);
+  const [showMatching, setShowMatching] = useState(false);
 
   // Monitor authentication state
   useEffect(() => {
@@ -39,50 +43,159 @@ const Jobs = () => {
     return () => unsubscribe();
   }, []);
 
-  // Fetch jobs from Firebase
+  // Fetch jobs and user profile from Firebase
+  useEffect(() => {
+    if (currentUser) {
+      loadUserProfile();
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     loadJobs();
-  }, [currentUser]);
+  }, [currentUser, userProfile]);
+
+  const loadUserProfile = async () => {
+    try {
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setUserProfile(userData);
+        
+        // Check if profile is complete
+        const hasRequiredFields = userData.skills?.length > 0 && 
+                                 userData.experienceLevel && 
+                                 userData.preferredTrack;
+        
+        console.log('User Profile Data:', {
+          hasSkills: userData.skills?.length > 0,
+          skills: userData.skills,
+          experienceLevel: userData.experienceLevel,
+          preferredTrack: userData.preferredTrack,
+          hasRequiredFields
+        });
+        
+        setShowMatching(hasRequiredFields);
+      } else {
+        console.log('No user profile document found');
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    }
+  };
 
   const loadJobs = async () => {
     try {
       setLoading(true);
-      const jobsRef = collection(db, 'Jobs');
-      const snapshot = await getDocs(jobsRef);
+      
+      // Try to load from 'jobs' collection first, then fall back to 'Jobs'
+      let jobsRef = collection(db, 'jobs');
+      let snapshot = await getDocs(jobsRef);
+      
+      // If 'jobs' collection is empty, try 'Jobs' collection
+      if (snapshot.empty) {
+        console.log('jobs collection empty, trying Jobs collection');
+        jobsRef = collection(db, 'Jobs');
+        snapshot = await getDocs(jobsRef);
+      }
       
       const jobsData = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
         
-        // Count applicants
-        const applicantCount = Object.keys(data).filter(key => 
-          key.startsWith('Applicant_')
-        ).length;
-
-        // Check if current user has applied
-        const hasApplied = currentUser ? Object.keys(data).some(key => 
-          key.startsWith('Applicant_') && data[key] === currentUser.email
-        ) : false;
-
-        jobsData.push({
-          id: doc.id,
-          title: doc.id,
-          details: data['Job Details'] || data.JobDetails || 'No details available',
-          salary: data.Salary || 'Not specified',
-          company: data['Company Name'] || data.CompanyName || 'Company not specified',
-          applicantCount,
-          hasApplied
+        // Check if it's the new format (with skillsRequired) or old format
+        const isNewFormat = data.skillsRequired && data.experienceRequired && data.track;
+        
+        console.log(`Job ${docSnap.id}:`, {
+          isNewFormat,
+          hasSkillsRequired: !!data.skillsRequired,
+          hasExperienceRequired: !!data.experienceRequired,
+          hasTrack: !!data.track
         });
+        
+        if (isNewFormat) {
+          // New format for job matching
+          jobsData.push({
+            id: docSnap.id,
+            title: data.title || docSnap.id,
+            details: data.description || 'No details available',
+            salary: data.salary || 'Not specified',
+            company: data.company || 'Company not specified',
+            location: data.location || 'Not specified',
+            skillsRequired: data.skillsRequired || [],
+            experienceRequired: data.experienceRequired || '',
+            track: data.track || '',
+            applyLinks: data.applyLinks || {},
+            applicantCount: 0,
+            hasApplied: false,
+            isNewFormat: true
+          });
+        } else {
+          // Old format - backwards compatibility
+          const applicantCount = Object.keys(data).filter(key => 
+            key.startsWith('Applicant_')
+          ).length;
+
+          const hasApplied = currentUser ? Object.keys(data).some(key => 
+            key.startsWith('Applicant_') && data[key] === currentUser.email
+          ) : false;
+
+          jobsData.push({
+            id: docSnap.id,
+            title: docSnap.id,
+            details: data['Job Details'] || data.JobDetails || 'No details available',
+            salary: data.Salary || 'Not specified',
+            company: data['Company Name'] || data.CompanyName || 'Company not specified',
+            applicantCount,
+            hasApplied,
+            isNewFormat: false
+          });
+        }
       });
 
       setJobs(jobsData);
       setFilteredJobs(jobsData);
+      
+      // Calculate matches if user profile exists
+      if (userProfile) {
+        calculateTopMatches(jobsData);
+      }
     } catch (error) {
       console.error('Error loading jobs:', error);
       showNotification('Failed to load jobs', 'error');
     } finally {
       setLoading(false);
     }
+  };
+
+  const calculateTopMatches = (jobsList) => {
+    if (!userProfile || !userProfile.skills || !userProfile.experienceLevel || !userProfile.preferredTrack) {
+      setTopMatches([]);
+      return;
+    }
+
+    // Filter only new format jobs
+    const matchableJobs = jobsList.filter(job => job.isNewFormat);
+    
+    if (matchableJobs.length === 0) {
+      setTopMatches([]);
+      return;
+    }
+
+    // Calculate match scores
+    const jobsWithScores = matchableJobs.map(job => {
+      const matchResult = calculateMatchScore(userProfile, job);
+      return {
+        ...job,
+        matchScore: matchResult.score,
+        matchDetails: matchResult
+      };
+    });
+
+    // Sort by match score and take top 3
+    const sorted = jobsWithScores.sort((a, b) => b.matchScore - a.matchScore);
+    setTopMatches(sorted.slice(0, 3));
   };
 
   // Handle search
@@ -230,6 +343,139 @@ const Jobs = () => {
               </p>
             )}
           </motion.div>
+
+          {/* Top Job Matches Section */}
+          {currentUser && showMatching && topMatches.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+              className="mt-12"
+            >
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-white/10 flex items-center justify-center">
+                      <Target size={24} className="text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold">Your Top Matches</h2>
+                      <p className="text-sm opacity-80">AI-powered recommendations</p>
+                    </div>
+                  </div>
+                  <span className="px-3 py-1 bg-white/20 rounded-full text-sm font-semibold">
+                    AI-Powered
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {topMatches.map((job, index) => {
+                    const matchLevel = getMatchLevel(job.matchScore);
+                    return (
+                      <motion.div
+                        key={job.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.5 + index * 0.1 }}
+                        onClick={() => setSelectedJob(job)}
+                        className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20 hover:bg-white/20 transition-all cursor-pointer group"
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-white group-hover:text-yellow-200 transition-colors line-clamp-1">
+                              {job.title}
+                            </h3>
+                            <p className="text-sm text-white/70 line-clamp-1">{job.company}</p>
+                          </div>
+                          <div className={`ml-2 px-3 py-1 rounded-lg text-sm font-bold ${
+                            job.matchScore >= 80 ? 'bg-green-500/30 text-green-200' :
+                            job.matchScore >= 60 ? 'bg-blue-500/30 text-blue-200' :
+                            'bg-yellow-500/30 text-yellow-200'
+                          }`}>
+                            {job.matchScore}%
+                          </div>
+                        </div>
+
+                        {/* Matched Skills */}
+                        {job.matchDetails.matchedSkills.length > 0 && (
+                          <div className="mb-3">
+                            <p className="text-xs text-green-200 mb-1 font-semibold">✓ You Have:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {job.matchDetails.matchedSkills.slice(0, 3).map((skill, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-green-500/20 text-green-200 rounded text-xs">
+                                  {skill}
+                                </span>
+                              ))}
+                              {job.matchDetails.matchedSkills.length > 3 && (
+                                <span className="px-2 py-0.5 bg-white/10 text-white/70 rounded text-xs">
+                                  +{job.matchDetails.matchedSkills.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Missing Skills */}
+                        {job.matchDetails.missingSkills.length > 0 && (
+                          <div className="mb-3">
+                            <p className="text-xs text-orange-200 mb-1 font-semibold">⚠ To Learn:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {job.matchDetails.missingSkills.slice(0, 3).map((skill, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-orange-500/20 text-orange-200 rounded text-xs">
+                                  {skill}
+                                </span>
+                              ))}
+                              {job.matchDetails.missingSkills.length > 3 && (
+                                <span className="px-2 py-0.5 bg-white/10 text-white/70 rounded text-xs">
+                                  +{job.matchDetails.missingSkills.length - 3}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-xs text-white/70 pt-2 border-t border-white/10">
+                          <span className="flex items-center gap-1">
+                            <Award size={12} />
+                            {job.experienceRequired}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <Zap size={12} className={matchLevel.textColor.replace('text-', 'text-white')} />
+                            {matchLevel.level}
+                          </span>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+
+                <p className="mt-4 text-center text-sm text-white/70">
+                  Scroll down to see all {filteredJobs.length} available positions
+                </p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Profile Incomplete Warning */}
+          {currentUser && !showMatching && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="mt-8 bg-yellow-500/20 backdrop-blur-md rounded-xl p-4 border border-yellow-400/30 max-w-2xl mx-auto"
+            >
+              <div className="flex items-center gap-3">
+                <AlertCircle size={24} className="text-yellow-200 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-white font-semibold mb-1">Complete your profile to see personalized job matches!</p>
+                  <p className="text-white/80 text-sm">Add your skills, experience level, and preferred career track in your profile.</p>
+                </div>
+                <a href="/profile" className="btn-outline-neon whitespace-nowrap">
+                  Update Profile
+                </a>
+              </div>
+            </motion.div>
+          )}
         </div>
       </div>
 
@@ -304,41 +550,111 @@ const Jobs = () => {
                   exit={{ opacity: 0 }}
                   className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
                 >
-                  {filteredJobs.map((job, index) => (
-                    <motion.div
-                      key={job.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      whileHover={{ y: -8, scale: 1.02 }}
-                      className="neon-card overflow-hidden transition-all group"
-                    >
-                      {/* Card Header with Gradient */}
-                      <div className="h-2 bg-card-gradient"></div>
-                      
-                      <div className="p-6">
-                        {/* Company Badge */}
-                        <div className="flex items-center gap-2 mb-4">
-                          <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{background:'rgba(168,85,247,0.06)'}}>
-                            <Building2 className="text-primary glow-icon" size={24} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-semibold text-main truncate">
-                              {job.company}
-                            </h4>
-                            <p className="text-xs text-muted">Company</p>
-                          </div>
-                        </div>
-
-                        {/* Applied Badge */}
-                        {job.hasApplied && (
-                          <div className="mb-3">
-                            <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-[#A855F7] to-[#D500F9] text-white px-3 py-1.5 rounded-full text-xs font-semibold">
-                              <CheckCircle size={14} />
-                              Already Applied
-                            </span>
+                  {filteredJobs.map((job, index) => {
+                    // Calculate match score for this job if user profile exists
+                    let matchScore = null;
+                    let matchDetails = null;
+                    if (userProfile && job.isNewFormat && userProfile.skills?.length > 0 && userProfile.experienceLevel && userProfile.preferredTrack) {
+                      const result = calculateMatchScore(userProfile, job);
+                      matchScore = result.score;
+                      matchDetails = result;
+                    }
+                    
+                    return (
+                      <motion.div
+                        key={job.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        whileHover={{ y: -8, scale: 1.02 }}
+                        className="neon-card overflow-hidden transition-all group relative"
+                      >
+                        {/* Card Header with Gradient */}
+                        <div className="h-2 bg-card-gradient"></div>
+                        
+                        {/* Match Percentage Badge */}
+                        {matchScore !== null && (
+                          <div className="absolute top-16 right-4 z-10">
+                            <motion.div 
+                              initial={{ scale: 0.95, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ delay: index * 0.05 + 0.1 }}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-semibold shadow-md border ${
+                              matchScore >= 80 ? 'bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400' :
+                              matchScore >= 60 ? 'bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400' :
+                              matchScore >= 40 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400' :
+                              'bg-gray-500/10 border-gray-500/30 text-gray-600 dark:text-gray-400'
+                            }`}>
+                              {matchScore}% Match
+                            </motion.div>
                           </div>
                         )}
+                        
+                        <div className="p-6">
+                          {/* Company Badge */}
+                          <div className="flex items-center gap-2 mb-4">
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{background:'rgba(168,85,247,0.06)'}}>
+                              <Building2 className="text-primary glow-icon" size={24} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-main truncate">
+                                {job.company}
+                              </h4>
+                              <p className="text-xs text-muted">Company</p>
+                            </div>
+                          </div>
+
+                          {/* Applied Badge */}
+                          {job.hasApplied && (
+                            <div className="mb-3">
+                              <span className="inline-flex items-center gap-1.5 bg-gradient-to-r from-[#A855F7] to-[#D500F9] text-white px-3 py-1.5 rounded-full text-xs font-semibold">
+                                <CheckCircle size={14} />
+                                Already Applied
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Matched Skills Tags */}
+                          {matchDetails && matchDetails.matchedSkills.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-xs text-muted mb-2 flex items-center gap-1">
+                                <span className="text-green-600 dark:text-green-400">✓</span> Matched Skills:
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {matchDetails.matchedSkills.slice(0, 4).map((skill, idx) => (
+                                  <span key={idx} className="px-2 py-1 bg-green-500/20 text-green-600 dark:text-green-400 rounded text-xs font-medium">
+                                    {skill}
+                                  </span>
+                                ))}
+                                {matchDetails.matchedSkills.length > 4 && (
+                                  <span className="px-2 py-1 bg-gray-500/20 text-gray-600 dark:text-gray-400 rounded text-xs">
+                                    +{matchDetails.matchedSkills.length - 4} more
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Missing Skills Tags */}
+                          {matchDetails && matchDetails.missingSkills.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-xs text-muted mb-2 flex items-center gap-1">
+                                <span className="text-orange-600 dark:text-orange-400">⚠</span> Skills to Learn:
+                              </p>
+                              <div className="flex flex-wrap gap-1">
+                                {matchDetails.missingSkills.slice(0, 4).map((skill, idx) => (
+                                  <span key={idx} className="px-2 py-1 bg-orange-500/20 text-orange-600 dark:text-orange-400 rounded text-xs font-medium">
+                                    {skill}
+                                  </span>
+                                ))}
+                                {matchDetails.missingSkills.length > 4 && (
+                                  <span className="px-2 py-1 bg-gray-500/20 text-gray-600 dark:text-gray-400 rounded text-xs">
+                                    +{matchDetails.missingSkills.length - 4} more
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
 
                         {/* Job Title */}
                         <h3 className="text-xl font-bold mb-3 glow-text line-clamp-2">
@@ -390,7 +706,8 @@ const Jobs = () => {
                         </div>
                       </div>
                     </motion.div>
-                  ))}
+                    );
+                  })}
                 </motion.div>
               ) : (
                 <motion.div

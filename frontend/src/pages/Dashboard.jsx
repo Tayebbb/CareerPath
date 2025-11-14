@@ -27,12 +27,15 @@ const Dashboard = () => {
   const [recommendedCourses, setRecommendedCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recommendations] = useState({ jobs: [], resources: [] });
+  const [profileCompletion, setProfileCompletion] = useState(0);
+  const [userProfile, setUserProfile] = useState(null);
 
   // Monitor authentication state
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       if (user) {
+        loadUserProfile(user.uid);
         fetchEnrolledCourses(user.email);
         fetchRecommendedCourses(user.email);
       } else {
@@ -41,6 +44,50 @@ const Dashboard = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // Load user profile and calculate completion
+  const loadUserProfile = async (userId) => {
+    try {
+      const userDocRef = doc(db, 'users', userId);
+      const userDoc = await getDoc(userDocRef);
+      
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        setUserProfile(userData);
+        calculateCompletion(userData);
+      } else {
+        setProfileCompletion(0);
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+      setProfileCompletion(0);
+    }
+  };
+
+  const calculateCompletion = (data) => {
+    const fields = [
+      { key: 'bio', weight: 10 },
+      { key: 'skills', weight: 30, check: (val) => val && val.length > 0 },
+      { key: 'experienceLevel', weight: 20 },
+      { key: 'preferredTrack', weight: 20 },
+      { key: 'location', weight: 10 },
+      { key: 'education', weight: 10 }
+    ];
+    
+    let completed = 0;
+    fields.forEach(field => {
+      const value = data[field.key];
+      const isComplete = field.check 
+        ? field.check(value) 
+        : value && value.toString().trim() !== '';
+      
+      if (isComplete) {
+        completed += field.weight;
+      }
+    });
+    
+    setProfileCompletion(completed);
+  };
 
   // Fetch courses where user is enrolled
   const fetchEnrolledCourses = async (userEmail) => {
@@ -187,8 +234,11 @@ const Dashboard = () => {
           <StatCard 
             icon={User} 
             label="Profile Completion" 
-            value="75%" 
-            color="bg-gradient-to-br from-[#A855F7] to-[#7C3AED]" 
+            value={`${profileCompletion}%`}
+            color={profileCompletion === 100 
+              ? "bg-gradient-to-br from-green-500 to-emerald-500" 
+              : "bg-gradient-to-br from-[#A855F7] to-[#7C3AED]"}
+            subtext={profileCompletion === 100 ? "Complete!" : "Keep going!"}
           />
           <StatCard 
             icon={Briefcase} 

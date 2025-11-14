@@ -1,27 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Briefcase, BookOpen, TrendingUp, ArrowRight, GraduationCap, CheckCircle, Sparkles } from 'lucide-react';
-import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, doc, getDoc } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { db, auth } from '../firebase';
 import { calculateMatchScore } from '../utils/matchScore';
 import { getLearningSuggestions } from '../utils/getLearningSuggestions';
-
-// Firebase Configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyC8za3ZI4m9gUrYsueUum907vpuKzV8H0Q",
-  authDomain: "iiuc25.firebaseapp.com",
-  projectId: "iiuc25",
-  storageBucket: "iiuc25.firebasestorage.app",
-  messagingSenderId: "75690391713",
-  appId: "1:75690391713:web:4c72c5316547c8bc68d8e0",
-  measurementId: "G-82V42TWJ9J"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
 
 const Dashboard = () => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -134,11 +118,15 @@ const Dashboard = () => {
       const userDocRef = doc(db, 'users', userId);
       const userDoc = await getDoc(userDocRef);
       
-      if (!userDoc.exists() || !userDoc.data().skills) {
+      if (!userDoc.exists()) {
         return;
       }
 
       const userData = userDoc.data();
+      
+      if (!userData.skills || userData.skills.length === 0) {
+        return;
+      }
 
       // Get all jobs
       const jobsSnapshot = await getDocs(collection(db, 'jobs'));
@@ -175,18 +163,22 @@ const Dashboard = () => {
       });
 
       // Get learning suggestions for missing skills
-      const suggestions = getLearningSuggestions(Array.from(allMissingSkills), allResources);
+      const result = getLearningSuggestions(Array.from(allMissingSkills), allResources);
       
       // Flatten suggestions into single array
       const resources = [];
-      Object.values(suggestions).forEach(skillResources => {
-        resources.push(...skillResources);
-      });
+      if (result.suggestions && Array.isArray(result.suggestions)) {
+        result.suggestions.forEach(suggestion => {
+          if (suggestion.resources && Array.isArray(suggestion.resources)) {
+            resources.push(...suggestion.resources);
+          }
+        });
+      }
 
-      // Remove duplicates and take top 6
+      // Remove duplicates - keep all for the resources page
       const uniqueResources = Array.from(
         new Map(resources.map(r => [r.id, r])).values()
-      ).slice(0, 6);
+      );
 
       setSkillGapResources(uniqueResources);
     } catch (error) {
@@ -436,10 +428,10 @@ const Dashboard = () => {
             </div>
             {skillGapResources.length > 0 && (
               <a 
-                href="/jobs" 
+                href="/learning-resources" 
                 className="text-primary hover:text-primary-light flex items-center gap-2 font-medium transition-colors"
               >
-                <span>View All in Jobs</span>
+                <span>View All</span>
                 <ArrowRight size={18} />
               </a>
             )}
@@ -457,11 +449,23 @@ const Dashboard = () => {
                   Based on your skill gaps from top job matches
                 </p>
               </motion.div>
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {skillGapResources.map((resource, index) => (
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                {skillGapResources.slice(0, 3).map((resource, index) => (
                   <SkillGapResourceCard key={resource.id} resource={resource} index={index} />
                 ))}
               </div>
+              {skillGapResources.length > 3 && (
+                <div className="text-center">
+                  <a 
+                    href="/learning-resources" 
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-lg transition-all hover:shadow-lg hover:shadow-purple-500/50"
+                  >
+                    <BookOpen size={20} />
+                    Show All {skillGapResources.length} Resources
+                    <ArrowRight size={20} />
+                  </a>
+                </div>
+              )}
             </>
           ) : recommendations.resources.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -687,7 +691,7 @@ const SkillGapResourceCard = ({ resource, index }) => (
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay: index * 0.1 }}
-    href={resource.link}
+    href={resource.url}
     target="_blank"
     rel="noopener noreferrer"
     className="neon-card p-6 hover:shadow-xl transition-all hover:-translate-y-2 block group"
@@ -697,31 +701,25 @@ const SkillGapResourceCard = ({ resource, index }) => (
         {resource.title}
       </h3>
       <span className={`px-2 py-1 text-xs font-medium rounded whitespace-nowrap ml-2 ${
-        resource.type === 'Free' 
+        resource.cost === 'Free' 
           ? 'bg-green-500/20 text-green-400' 
           : 'bg-[rgba(213,0,249,0.1)] text-accent-pink'
       }`}>
-        {resource.type}
+        {resource.cost}
       </span>
     </div>
     
     <div className="flex items-center gap-2 mb-3">
       <span className="text-xs text-muted">{resource.platform}</span>
-      {resource.duration && (
-        <>
-          <span className="text-muted">•</span>
-          <span className="text-xs text-muted">{resource.duration}</span>
-        </>
-      )}
     </div>
 
     <div className="flex flex-wrap gap-2">
-      {resource.tags?.slice(0, 3).map((tag, idx) => (
+      {resource.relatedSkills?.slice(0, 3).map((skill, idx) => (
         <span 
           key={idx} 
           className="text-xs px-2 py-1 bg-purple-500/10 text-purple-300 rounded"
         >
-          {tag}
+          {skill}
         </span>
       ))}
     </div>

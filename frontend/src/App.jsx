@@ -19,6 +19,7 @@ import Home from "./pages/Home";
 import Jobs from "./pages/Jobs";
 import JobDetails from "./pages/JobDetails";
 import Resources from "./pages/Resources";
+import LearningResources from "./pages/LearningResources";
 import Contact from "./pages/Contact";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -52,6 +53,11 @@ function AppContent() {
             <Route path="/jobs" element={<ProtectedRoute><Jobs /></ProtectedRoute>} />
             <Route path="/jobs/:id" element={<JobDetails />} />
             <Route path="/resources" element={<Resources />} />
+            <Route path="/learning-resources" element={
+              <ProtectedRoute>
+                <LearningResources />
+              </ProtectedRoute>
+            } />
             <Route path="/contact" element={<Contact />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />

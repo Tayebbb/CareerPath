@@ -33,6 +33,9 @@ const AdminLogin = () => {
           navigate('/admin-dashboard');
         }, 1500);
         return () => clearTimeout(timer);
+      } else {
+        // User is not authenticated or not admin
+        setIsAuthenticated(false);
       }
     });
     return () => unsubscribe();

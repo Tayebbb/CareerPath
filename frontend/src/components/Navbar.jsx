@@ -37,6 +37,7 @@ const Navbar = () => {
   const navLinks = [
     { name: 'Jobs', href: '/jobs' },
     { name: 'Resources', href: '/resources' },
+    { name: 'AI Assistance', href: '/chatassistance' },
     { name: 'Contact', href: '/contact' },
   ];
 

@@ -26,7 +26,7 @@ import Signup from "./pages/Signup";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import Dashboard from "./pages/Dashboard";
-import ChatBot from "./pages/ChatBot";
+import Chatassistance from "./pages/chatassistance";
 import AdminPanel from "./pages/AdminPanel";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -64,7 +64,7 @@ function AppContent() {
             <Route path="/signup" element={<Register />} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/chatbot" element={<ProtectedRoute><ChatBot /></ProtectedRoute>} />
+            <Route path="/chatassistance" element={<ProtectedRoute><Chatassistance /></ProtectedRoute>} />
             <Route path="/admin-login" element={<AdminLogin />} />
             <Route path="/admin-dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
             <Route path="/admin/jobs" element={<AdminProtectedRoute><AdminPanel /></AdminProtectedRoute>} />

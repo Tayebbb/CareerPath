@@ -5,9 +5,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { User, Mail, Edit, Save, X, GraduationCap, Briefcase, Target } from 'lucide-react';
+import { User, Mail, Edit, Save, X, GraduationCap, Briefcase, Target, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { userService, applicationsService } from '../services/firestoreService';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import toast from 'react-hot-toast';
 
 const Profile = () => {
   const { currentUser } = useAuth();
@@ -15,13 +18,16 @@ const Profile = () => {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [skillInput, setSkillInput] = useState('');
+  const [profileCompletion, setProfileCompletion] = useState(0);
   const [formData, setFormData] = useState({
     bio: '',
     skills: [],
-    experience: '',
+    experienceLevel: '',
+    preferredTrack: '',
     location: '',
-    education: '',
-    careerTrack: ''
+    education: ''
   });
 
   useEffect(() => {
@@ -32,38 +38,97 @@ const Profile = () => {
 
   const loadUserData = async () => {
     try {
-      const [profileData, applicationsData] = await Promise.all([
-        userService.getUserProfile(currentUser.uid),
-        applicationsService.getUserApplications(currentUser.uid)
-      ]);
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userDocRef);
       
-      setProfile(profileData);
-      setApplications(applicationsData);
+      let userData = { email: currentUser.email, displayName: currentUser.displayName };
+      
+      if (userDoc.exists()) {
+        userData = { ...userData, ...userDoc.data() };
+      }
+      
+      setProfile(userData);
       
       // Set form data for editing
-      if (profileData?.profile) {
-        setFormData({
-          bio: profileData.profile.bio || '',
-          skills: profileData.profile.skills || [],
-          experience: profileData.profile.experience || '',
-          location: profileData.profile.location || '',
-          education: profileData.profile.education || '',
-          careerTrack: profileData.profile.careerTrack || ''
-        });
-      }
+      setFormData({
+        bio: userData.bio || '',
+        skills: userData.skills || [],
+        experienceLevel: userData.experienceLevel || '',
+        preferredTrack: userData.preferredTrack || '',
+        location: userData.location || '',
+        education: userData.education || ''
+      });
+      
+      // Calculate profile completion
+      calculateCompletion(userData);
+      
+      // Load applications
+      const applicationsData = await applicationsService.getUserApplications(currentUser.uid);
+      setApplications(applicationsData);
     } catch (error) {
       console.error('Error loading profile:', error);
+      toast.error('Failed to load profile');
     }
     setLoading(false);
   };
 
+  const calculateCompletion = (data) => {
+    const fields = [
+      { key: 'bio', weight: 10 },
+      { key: 'skills', weight: 30, check: (val) => val && val.length > 0 },
+      { key: 'experienceLevel', weight: 20 },
+      { key: 'preferredTrack', weight: 20 },
+      { key: 'location', weight: 10 },
+      { key: 'education', weight: 10 }
+    ];
+    
+    let completed = 0;
+    fields.forEach(field => {
+      const value = data[field.key];
+      const isComplete = field.check 
+        ? field.check(value) 
+        : value && value.toString().trim() !== '';
+      
+      if (isComplete) {
+        completed += field.weight;
+      }
+    });
+    
+    setProfileCompletion(completed);
+  };
+
   const handleUpdateProfile = async (updatedData) => {
+    // Validate mandatory fields
+    if (!updatedData.skills || updatedData.skills.length === 0) {
+      toast.error('Please add at least one skill');
+      return;
+    }
+    if (!updatedData.experienceLevel) {
+      toast.error('Please select your experience level');
+      return;
+    }
+    if (!updatedData.preferredTrack) {
+      toast.error('Please select your preferred career track');
+      return;
+    }
+
     try {
-      await userService.updateProfile(currentUser.uid, updatedData);
-      setProfile(prev => ({ ...prev, profile: updatedData }));
+      setSaving(true);
+      const userDocRef = doc(db, 'users', currentUser.uid);
+      await updateDoc(userDocRef, {
+        ...updatedData,
+        updatedAt: new Date().toISOString()
+      });
+      
+      setProfile(prev => ({ ...prev, ...updatedData }));
+      calculateCompletion(updatedData);
       setEditing(false);
+      toast.success('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
+      toast.error('Failed to update profile');
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -74,16 +139,34 @@ const Profile = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name === 'skills') {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const addSkill = () => {
+    const trimmed = skillInput.trim().toLowerCase();
+    if (trimmed && !formData.skills.includes(trimmed)) {
       setFormData(prev => ({
         ...prev,
-        skills: value.split(',').map(skill => skill.trim())
+        skills: [...prev.skills, trimmed]
       }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
+      setSkillInput('');
+    }
+  };
+
+  const removeSkill = (skillToRemove) => {
+    setFormData(prev => ({
+      ...prev,
+      skills: prev.skills.filter(skill => skill !== skillToRemove)
+    }));
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addSkill();
     }
   };
 
@@ -126,9 +209,145 @@ const Profile = () => {
             </button>
           </div>
 
+          {/* Profile Completion Bar */}
+          <div className="mb-6 p-4 bg-[#11152B] rounded-lg border border-primary/20">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-main">Profile Completion</span>
+              <span className={`text-lg font-bold ${profileCompletion === 100 ? 'text-green-400' : 'text-primary'}`}>
+                {profileCompletion}%
+              </span>
+            </div>
+            <div className="h-3 bg-[#0B0E1C] rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${profileCompletion}%` }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+                className={`h-full rounded-full ${
+                  profileCompletion === 100 
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500' 
+                    : 'bg-gradient-to-r from-[#A855F7] to-[#D500F9]'
+                }`}
+              />
+            </div>
+            {profileCompletion < 100 && (
+              <p className="text-xs text-muted mt-2 flex items-center gap-1">
+                <AlertCircle size={12} />
+                Complete your profile to get better job matches
+              </p>
+            )}
+            {profileCompletion === 100 && (
+              <p className="text-xs text-green-400 mt-2 flex items-center gap-1">
+                <CheckCircle size={12} />
+                Your profile is complete!
+              </p>
+            )}
+          </div>
+
           {/* Profile Form */}
           {editing ? (
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Mandatory Fields Alert */}
+              <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
+                <p className="text-sm text-primary flex items-center gap-2">
+                  <AlertCircle size={16} />
+                  <span><strong>Required fields</strong> are marked with <span className="text-red-400">*</span></span>
+                </p>
+              </div>
+
+              {/* Skills - MANDATORY */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Skills <span className="text-red-400">*</span>
+                </label>
+                <p className="text-xs text-muted mb-2">Add your technical skills (press Enter or click Add)</p>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={skillInput}
+                    onChange={(e) => setSkillInput(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className="input-field flex-1"
+                    placeholder="e.g., React, JavaScript, Python..."
+                  />
+                  <button
+                    type="button"
+                    onClick={addSkill}
+                    className="btn-primary px-6"
+                  >
+                    Add
+                  </button>
+                </div>
+                {formData.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {formData.skills.map((skill, idx) => (
+                      <span
+                        key={idx}
+                        className="px-3 py-1 bg-primary/20 border border-primary/40 rounded-full text-sm text-primary flex items-center gap-2"
+                      >
+                        {skill}
+                        <button
+                          type="button"
+                          onClick={() => removeSkill(skill)}
+                          className="hover:text-red-400 transition-colors"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {formData.skills.length === 0 && (
+                  <p className="text-xs text-red-400">Please add at least one skill</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Experience Level - MANDATORY */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    <Briefcase size={16} className="inline mr-1" />
+                    Experience Level <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    name="experienceLevel"
+                    value={formData.experienceLevel}
+                    onChange={handleChange}
+                    className="input-field"
+                    required
+                  >
+                    <option value="">Select experience level</option>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </select>
+                </div>
+
+                {/* Preferred Track - MANDATORY */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">
+                    <Target size={16} className="inline mr-1" />
+                    Preferred Career Track <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    name="preferredTrack"
+                    value={formData.preferredTrack}
+                    onChange={handleChange}
+                    className="input-field"
+                    required
+                  >
+                    <option value="">Select career track</option>
+                    <option value="frontend">Frontend Development</option>
+                    <option value="backend">Backend Development</option>
+                    <option value="fullstack">Full Stack Development</option>
+                    <option value="mobile">Mobile Development</option>
+                    <option value="devops">DevOps / Cloud</option>
+                    <option value="data science">Data Science / ML</option>
+                    <option value="qa">QA / Testing</option>
+                    <option value="ui/ux">UI/UX Design</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
@@ -145,17 +364,14 @@ const Profile = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-2">
-                    <Target size={16} className="inline mr-1" />
-                    Career Track
-                  </label>
+                  <label className="block text-sm font-medium mb-2">Location</label>
                   <input
                     type="text"
-                    name="careerTrack"
-                    value={formData.careerTrack}
+                    name="location"
+                    value={formData.location}
                     onChange={handleChange}
                     className="input-field"
-                    placeholder="Your career focus"
+                    placeholder="City, Country"
                   />
                 </div>
               </div>
@@ -172,108 +388,83 @@ const Profile = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Skills (comma-separated)</label>
-                <input
-                  type="text"
-                  name="skills"
-                  value={formData.skills.join(', ')}
-                  onChange={handleChange}
-                  className="input-field"
-                  placeholder="JavaScript, React, Node.js, etc."
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    <Briefcase size={16} className="inline mr-1" />
-                    Experience Level
-                  </label>
-                  <input
-                    type="text"
-                    name="experience"
-                    value={formData.experience}
-                    onChange={handleChange}
-                    className="input-field"
-                    placeholder="Student, Junior, Senior, etc."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Location</label>
-                  <input
-                    type="text"
-                    name="location"
-                    value={formData.location}
-                    onChange={handleChange}
-                    className="input-field"
-                    placeholder="City, Country"
-                  />
-                </div>
-              </div>
-
               <button
                 type="submit"
-                className="btn-primary flex items-center space-x-2"
+                disabled={saving}
+                className="btn-primary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save size={16} />
-                <span>Save Changes</span>
+                <span>{saving ? 'Saving...' : 'Save Changes'}</span>
               </button>
             </form>
           ) : (
             <div className="space-y-6">
+              {/* Mandatory Fields */}
+              <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                <h3 className="font-semibold mb-3 text-main flex items-center gap-2">
+                  <Target size={18} />
+                  Job Matching Profile
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2 flex items-center text-muted">
+                      <Briefcase size={14} className="mr-2" />
+                      Experience Level {!profile?.experienceLevel && <span className="text-red-400 ml-1">*</span>}
+                    </h4>
+                    <p className={profile?.experienceLevel ? "text-main capitalize" : "text-red-400"}>
+                      {profile?.experienceLevel || 'Not set - Required!'}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2 flex items-center text-muted">
+                      <Target size={14} className="mr-2" />
+                      Career Track {!profile?.preferredTrack && <span className="text-red-400 ml-1">*</span>}
+                    </h4>
+                    <p className={profile?.preferredTrack ? "text-main capitalize" : "text-red-400"}>
+                      {profile?.preferredTrack || 'Not set - Required!'}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="mt-4">
+                  <h4 className="text-sm font-semibold mb-2 text-muted">
+                    Skills {(!profile?.skills || profile.skills.length === 0) && <span className="text-red-400">*</span>}
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {profile?.skills?.length > 0 ? (
+                      profile.skills.map((skill, index) => (
+                        <span
+                          key={index}
+                          className="px-3 py-1 bg-primary/20 border border-primary/40 text-primary rounded-full text-sm"
+                        >
+                          {skill}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="text-red-400">No skills added - Required!</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Optional Fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <h3 className="font-semibold mb-2 flex items-center">
                     <GraduationCap size={16} className="mr-2" />
                     Education
                   </h3>
-                  <p className="text-muted">{profile?.profile?.education || 'Not specified'}</p>
+                  <p className="text-muted">{profile?.education || 'Not specified'}</p>
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-2 flex items-center">
-                    <Target size={16} className="mr-2" />
-                    Career Track
-                  </h3>
-                  <p className="text-muted">{profile?.profile?.careerTrack || 'Not specified'}</p>
+                  <h3 className="font-semibold mb-2">Location</h3>
+                  <p className="text-muted">{profile?.location || 'Not specified'}</p>
                 </div>
               </div>
 
               <div>
                 <h3 className="font-semibold mb-2">Bio</h3>
-                <p className="text-muted">{profile?.profile?.bio || 'No bio available'}</p>
-              </div>
-
-              <div>
-                <h3 className="font-semibold mb-2">Skills</h3>
-                <div className="flex flex-wrap gap-2">
-                  {profile?.profile?.skills?.length > 0 ? (
-                    profile.profile.skills.map((skill, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-[rgba(168,85,247,0.1)] text-primary rounded-full text-sm"
-                      >
-                        {skill}
-                      </span>
-                    ))
-                  ) : (
-                    <p className="text-muted">No skills added</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="font-semibold mb-2 flex items-center">
-                    <Briefcase size={16} className="mr-2" />
-                    Experience
-                  </h3>
-                  <p className="text-muted">{profile?.profile?.experience || 'Not specified'}</p>
-                </div>
-                <div>
-                  <h3 className="font-semibold mb-2">Location</h3>
-                  <p className="text-muted">{profile?.profile?.location || 'Not specified'}</p>
-                </div>
+                <p className="text-muted">{profile?.bio || 'No bio available'}</p>
               </div>
             </div>
           )}

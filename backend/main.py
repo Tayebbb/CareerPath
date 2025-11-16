@@ -17,19 +17,11 @@ app = FastAPI()
 # Configure CORS middleware FIRST (before routes)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:3000",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://localhost:5176",
-        "https://careerpath-weld.vercel.app",
-        "https://careerpath-weld-git-main-tayebbbs-projects.vercel.app",
-        "https://*.vercel.app",
-    ],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_origins=["*"],  # Allow all origins for now
+    allow_credentials=False,
+    allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Initialize Gemini client
@@ -51,6 +43,7 @@ class Message(TypedDict, total=False):
 
 @app.get("/")
 async def root():
+    """Health check endpoint"""
     return {"message": "Gemini Chatbot API is running"}
 
 @app.options("/chat")
@@ -60,6 +53,10 @@ async def options_chat():
 @app.post("/chat")
 async def chat(req: Dict[str, Any]):
     try:
+        # Validate API key
+        if not api_key:
+            raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+        
         # Build contents list for Gemini API
         contents = []
         
@@ -95,7 +92,10 @@ async def chat(req: Dict[str, Any]):
         
         return {"reply": reply_text}
     
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Error in chat endpoint: {str(e)}")  # Log to Vercel logs
         error_message = f"Error talking to Gemini: {str(e)}"
         raise HTTPException(status_code=500, detail=error_message)
 

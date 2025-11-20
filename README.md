@@ -82,6 +82,29 @@ Aligned with **UN Sustainable Development Goal 8** (Decent Work and Economic Gro
 - User activity monitoring
 - Application tracking
 
+✅ **AI-Powered Mock Interview**
+
+- Role-based interview question generation (Software Engineer, Data Scientist, etc.)
+- Difficulty level selection (Easy, Medium, Hard)
+- Real-time answer evaluation using Gemini AI
+- Detailed feedback with:
+  - Score (0-100)
+  - Strengths identification
+  - Areas for improvement
+  - Suggested answers
+- Interview history tracking
+- Session performance analytics
+- Multiple interview rounds support
+
+✅ **Interactive Career Chatbot**
+
+- Gemini AI-powered conversational assistant
+- Career guidance and job search help
+- Skill development recommendations
+- Markdown-formatted responses with syntax highlighting
+- Chat history persistence
+- Context-aware conversations
+
 ---
 
 ## 🌐 External APIs & Services
@@ -177,6 +200,13 @@ VITE_GEMINI_API_KEY = AIzaSyCocHsm5Efg84WIiEyNh_DkVkiAbbV5JC8;
    - Career guidance chatbot
    - Context-aware conversations
    - History tracking
+   - Markdown response rendering
+
+3. **Mock Interview System** (`backend/main.py` - `/generate-interview-question`, `/evaluate-interview-answer`)
+   - Dynamic interview question generation based on role and difficulty
+   - AI-powered answer evaluation with detailed feedback
+   - Scoring system (0-100)
+   - Personalized improvement suggestions
 
 **Setup Instructions:**
 
@@ -232,14 +262,19 @@ VITE_GEMINI_API_KEY = AIzaSyCocHsm5Efg84WIiEyNh_DkVkiAbbV5JC8;
 
 ### 4. **Backend API (FastAPI - Python)**
 
-**Service:** Internal REST API for AI chat functionality
+**Service:** Internal REST API for AI functionality
 
 **Framework:** FastAPI (Python)
 
-**Endpoint:**
+**Deployment:** Vercel Serverless Functions
+- Frontend: https://careerpath-weld.vercel.app
+- Backend: https://backendcareerpath.vercel.app
 
+**Endpoints:**
+
+1. **Chat Endpoint**
 ```
-POST http://localhost:8000/chat
+POST /chat
 Content-Type: application/json
 
 Body:
@@ -247,8 +282,76 @@ Body:
   "message": "User message",
   "history": [
     {"role": "user", "content": "Previous message"},
-    {"role": "assistant", "content": "Previous response"}
+    {"role": "model", "content": "Previous response"}
   ]
+}
+
+Response:
+{
+  "reply": "AI-generated response"
+}
+```
+
+2. **CV Analysis Endpoint**
+```
+POST /summarize-cv
+Content-Type: multipart/form-data
+
+Body:
+{
+  "file": <PDF file>
+}
+
+Response:
+{
+  "data": {
+    "keySkills": ["skill1", "skill2", ...],
+    "toolsTechnologies": ["tool1", "tool2", ...],
+    "rolesAndDomains": ["role1", "domain1", ...]
+  },
+  "raw_text": "Extracted text from PDF"
+}
+```
+
+3. **Mock Interview - Generate Question**
+```
+POST /generate-interview-question
+Content-Type: application/json
+
+Body:
+{
+  "role": "Software Engineer",
+  "difficulty": "Medium",
+  "questionNumber": 1,
+  "previousQuestions": ["question1", "question2", ...]
+}
+
+Response:
+{
+  "question": "Generated interview question"
+}
+```
+
+4. **Mock Interview - Evaluate Answer**
+```
+POST /evaluate-interview-answer
+Content-Type: application/json
+
+Body:
+{
+  "question": "The interview question",
+  "answer": "Candidate's answer",
+  "role": "Software Engineer",
+  "difficulty": "Medium"
+}
+
+Response:
+{
+  "score": 85,
+  "strengths": ["Good technical knowledge", "Clear explanation"],
+  "improvements": ["Add more examples", "Discuss edge cases"],
+  "detailedFeedback": "Your answer demonstrates...",
+  "suggestedAnswer": "A strong answer would include..."
 }
 ```
 

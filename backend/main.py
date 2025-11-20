@@ -41,27 +41,6 @@ class Message(TypedDict, total=False):
 #   Chat request JSON: {"message": "<text>", "history": [{"role":"user","content":"..."}, ...]}
 #   Chat response JSON: {"reply": "<text>"}
 
-class InterviewQuestionRequest(BaseModel):
-    role: str
-    difficulty: str
-    questionNumber: int
-    previousQuestions: list[str] = []  # Track previous questions to avoid duplicates
-
-class InterviewAnswerRequest(BaseModel):
-    question: str
-    answer: str
-    role: str
-    difficulty: str
-
-class InterviewQuestionResponse(BaseModel):
-    question: str
-
-class InterviewFeedbackResponse(BaseModel):
-    score: float
-    feedback: str
-    strengths: list[str]
-    improvements: list[str]
-
 @app.get("/")
 async def root():
     """Health check endpoint"""
@@ -69,6 +48,12 @@ async def root():
 
 @app.options("/chat")
 async def options_chat():
+    """Handle preflight CORS requests"""
+    return {"message": "OK"}
+
+@app.options("/summarize-cv")
+async def options_summarize_cv():
+    """Handle preflight CORS requests"""
     return {"message": "OK"}
 
 @app.post("/chat")
@@ -213,113 +198,101 @@ async def summarize_cv(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=error_message)
 
 @app.options("/generate-interview-question")
-async def options_generate_question():
+async def options_generate_interview():
+    """Handle preflight CORS requests"""
     return {"message": "OK"}
 
-@app.post("/generate-interview-question", response_model=InterviewQuestionResponse)
-async def generate_interview_question(req: InterviewQuestionRequest):
+@app.post("/generate-interview-question")
+async def generate_interview_question(req: Dict[str, Any]):
     try:
-        # Map role to readable name
-        role_names = {
-            'frontend': 'Frontend Developer',
-            'backend': 'Backend Developer',
-            'fullstack': 'Full Stack Developer',
-            'data-science': 'Data Scientist',
-            'mobile': 'Mobile Developer',
-            'devops': 'DevOps Engineer',
-            'ui-ux': 'UI/UX Designer',
-            'product-manager': 'Product Manager'
-        }
+        # Validate API key
+        if not api_key:
+            raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
         
-        role_name = role_names.get(req.role, req.role)
+        role = req.get("role", "Software Engineer")
+        difficulty = req.get("difficulty", "Medium")
+        question_number = req.get("questionNumber", 1)
+        previous_questions = req.get("previousQuestions", [])
         
-        # Build previous questions context to avoid duplicates
-        previous_context = ""
-        if req.previousQuestions and len(req.previousQuestions) > 0:
-            previous_context = "\n\nPreviously asked questions (DO NOT repeat these):\n"
-            for i, prev_q in enumerate(req.previousQuestions, 1):
-                previous_context += f"{i}. {prev_q}\n"
-        
-        # Create prompt for interview question
-        prompt = f"""You are an experienced technical interviewer conducting a {req.difficulty} level interview for a {role_name} position.
+        # Build prompt for Gemini
+        prompt = f"""You are an expert interviewer conducting a {difficulty} level technical interview for a {role} position.
 
-Generate a single, NEW and UNIQUE interview question (Question #{req.questionNumber}) that:
-- Is appropriate for {req.difficulty} level candidates
-- Tests practical knowledge and problem-solving skills
-- Is clear and specific
-- Would be commonly asked in real {role_name} interviews
-- Is COMPLETELY DIFFERENT from any previously asked questions
+Generate ONE unique interview question for question #{question_number}.
 
-Difficulty guidelines:
-- Beginner: Basic concepts, syntax, fundamental principles (e.g., "What is a variable?", "Explain HTML tags")
-- Intermediate: Practical experience, common scenarios, best practices (e.g., "How do you handle API errors?", "Explain state management")
-- Advanced: System design, architecture, complex problem-solving, trade-offs (e.g., "Design a scalable chat system", "Explain microservices architecture")
+Previous questions asked (DO NOT repeat these):
+{chr(10).join(f"- {q}" for q in previous_questions) if previous_questions else "None yet"}
 
-IMPORTANT: 
-- Generate a DIFFERENT question each time
-- Maintain the {req.difficulty} difficulty level consistently
-- Avoid repeating topics from previous questions
-- Provide variety in question types (conceptual, practical, scenario-based){previous_context}
+Requirements:
+- Generate a {difficulty} difficulty question appropriate for a {role}
+- Make it practical and relevant to real-world scenarios
+- Ensure it's different from all previous questions
+- The question should test technical knowledge, problem-solving, or behavioral aspects
+- Return ONLY the question text, no additional formatting
 
-Return ONLY the interview question text, no additional formatting or labels."""
+Generate the question now:"""
 
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=prompt,
         )
         
-        question_text = ""
+        # Extract question from response
+        question = ""
         if response.candidates and len(response.candidates) > 0:
             candidate = response.candidates[0]
             if candidate.content and candidate.content.parts:
-                question_text = "".join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
+                question = "".join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
         
-        if not question_text:
-            question_text = "What interests you about this role and what relevant experience do you have?"
+        if not question:
+            question = f"Can you describe your experience with the key technologies required for a {role} role?"
         
-        return InterviewQuestionResponse(question=question_text.strip())
+        return {"question": question.strip()}
     
+    except HTTPException:
+        raise
     except Exception as e:
-        error_message = f"Error generating interview question: {str(e)}"
-        raise HTTPException(status_code=500, detail=error_message)
+        print(f"Error in generate interview question: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating question: {str(e)}")
 
 @app.options("/evaluate-interview-answer")
 async def options_evaluate_answer():
+    """Handle preflight CORS requests"""
     return {"message": "OK"}
 
-@app.post("/evaluate-interview-answer", response_model=InterviewFeedbackResponse)
-async def evaluate_interview_answer(req: InterviewAnswerRequest):
+@app.post("/evaluate-interview-answer")
+async def evaluate_interview_answer(req: Dict[str, Any]):
     try:
-        # Create prompt for evaluation
-        prompt = f"""You are an experienced technical interviewer evaluating a candidate's answer.
+        # Validate API key
+        if not api_key:
+            raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+        
+        question = req.get("question", "")
+        answer = req.get("answer", "")
+        role = req.get("role", "Software Engineer")
+        difficulty = req.get("difficulty", "Medium")
+        
+        # Build evaluation prompt
+        prompt = f"""You are an expert interviewer evaluating a candidate's answer for a {role} position ({difficulty} level).
 
-Interview Question: {req.question}
+Question Asked: {question}
 
-Candidate's Answer: {req.answer}
+Candidate's Answer: {answer}
 
-Job Role: {req.role}
-Difficulty Level: {req.difficulty}
-
-Evaluate this answer and provide:
-1. A score from 0-10 (be realistic and fair)
-2. Overall feedback (2-3 sentences)
-3. 2-3 specific strengths in the answer
-4. 2-3 specific areas for improvement
-
-Return your evaluation in this EXACT JSON format:
+Evaluate this answer and provide feedback in the following JSON format:
 {{
-    "score": <number between 0-10>,
-    "feedback": "<overall feedback>",
-    "strengths": ["<strength 1>", "<strength 2>", "<strength 3>"],
-    "improvements": ["<improvement 1>", "<improvement 2>", "<improvement 3>"]
+  "score": <number between 0-100>,
+  "strengths": ["strength 1", "strength 2", ...],
+  "improvements": ["area 1", "area 2", ...],
+  "detailedFeedback": "<2-3 sentences of constructive feedback>",
+  "suggestedAnswer": "<A brief example of a strong answer>"
 }}
 
-Scoring guidelines:
-- 9-10: Exceptional answer with deep understanding
-- 7-8: Strong answer with good knowledge
-- 5-6: Adequate answer with room for improvement
-- 3-4: Weak answer with significant gaps
-- 0-2: Poor answer with fundamental misunderstandings
+Evaluation criteria:
+- Technical accuracy and completeness
+- Clarity of communication
+- Relevance to the question
+- Demonstration of practical knowledge
+- Problem-solving approach
 
 Return ONLY the JSON object, no additional text."""
 
@@ -328,45 +301,57 @@ Return ONLY the JSON object, no additional text."""
             contents=prompt,
         )
         
-        feedback_text = ""
+        # Extract evaluation from response
+        evaluation_text = ""
         if response.candidates and len(response.candidates) > 0:
             candidate = response.candidates[0]
             if candidate.content and candidate.content.parts:
-                feedback_text = "".join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
+                evaluation_text = "".join(part.text for part in candidate.content.parts if hasattr(part, 'text'))
         
         # Parse JSON response
         import json
         try:
             # Clean markdown code blocks if present
-            cleaned_feedback = feedback_text.strip()
-            if cleaned_feedback.startswith("```json"):
-                cleaned_feedback = cleaned_feedback[7:]
-            if cleaned_feedback.startswith("```"):
-                cleaned_feedback = cleaned_feedback[3:]
-            if cleaned_feedback.endswith("```"):
-                cleaned_feedback = cleaned_feedback[:-3]
-            cleaned_feedback = cleaned_feedback.strip()
+            cleaned_eval = evaluation_text.strip()
+            if cleaned_eval.startswith("```json"):
+                cleaned_eval = cleaned_eval[7:]
+            if cleaned_eval.startswith("```"):
+                cleaned_eval = cleaned_eval[3:]
+            if cleaned_eval.endswith("```"):
+                cleaned_eval = cleaned_eval[:-3]
+            cleaned_eval = cleaned_eval.strip()
             
-            parsed_data = json.loads(cleaned_feedback)
+            evaluation = json.loads(cleaned_eval)
             
-            return InterviewFeedbackResponse(
-                score=float(parsed_data.get("score", 5)),
-                feedback=parsed_data.get("feedback", "Thank you for your answer."),
-                strengths=parsed_data.get("strengths", ["You provided an answer"]),
-                improvements=parsed_data.get("improvements", ["Consider providing more details"])
-            )
-        except (json.JSONDecodeError, KeyError, ValueError):
-            # Fallback if JSON parsing fails
-            return InterviewFeedbackResponse(
-                score=5.0,
-                feedback="Thank you for your answer. " + feedback_text[:200],
-                strengths=["You attempted the question"],
-                improvements=["Consider structuring your answer better", "Provide more specific examples"]
-            )
+            # Ensure all required fields exist
+            if "score" not in evaluation:
+                evaluation["score"] = 70
+            if "strengths" not in evaluation:
+                evaluation["strengths"] = ["Answer provided"]
+            if "improvements" not in evaluation:
+                evaluation["improvements"] = ["Could provide more details"]
+            if "detailedFeedback" not in evaluation:
+                evaluation["detailedFeedback"] = "Your answer shows understanding of the topic."
+            if "suggestedAnswer" not in evaluation:
+                evaluation["suggestedAnswer"] = "Consider expanding on key points with specific examples."
+            
+            return evaluation
+            
+        except json.JSONDecodeError:
+            # If JSON parsing fails, return a default evaluation
+            return {
+                "score": 70,
+                "strengths": ["Attempted to answer the question"],
+                "improvements": ["Could provide more specific details", "Consider using concrete examples"],
+                "detailedFeedback": "Your answer shows basic understanding. Try to elaborate more on technical details and provide real-world examples.",
+                "suggestedAnswer": "A strong answer would include specific technical details, practical examples, and demonstrate deep understanding of the concept."
+            }
     
+    except HTTPException:
+        raise
     except Exception as e:
-        error_message = f"Error evaluating answer: {str(e)}"
-        raise HTTPException(status_code=500, detail=error_message)
+        print(f"Error in evaluate answer: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error evaluating answer: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

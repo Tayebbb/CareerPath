@@ -197,6 +197,7 @@ VITE_GEMINI_API_KEY = AIzaSyCocHsm5Efg84WIiEyNh_DkVkiAbbV5JC8;
    - Resource recommendations
 
 2. **Chat Assistance** (`frontend/src/pages/Chatassistance.jsx`, `backend/main.py`)
+
    - Career guidance chatbot
    - Context-aware conversations
    - History tracking
@@ -267,12 +268,14 @@ VITE_GEMINI_API_KEY = AIzaSyCocHsm5Efg84WIiEyNh_DkVkiAbbV5JC8;
 **Framework:** FastAPI (Python)
 
 **Deployment:** Vercel Serverless Functions
+
 - Frontend: https://careerpath-weld.vercel.app
 - Backend: https://backendcareerpath.vercel.app
 
 **Endpoints:**
 
 1. **Chat Endpoint**
+
 ```
 POST /chat
 Content-Type: application/json
@@ -293,6 +296,7 @@ Response:
 ```
 
 2. **CV Analysis Endpoint**
+
 ```
 POST /summarize-cv
 Content-Type: multipart/form-data
@@ -314,6 +318,7 @@ Response:
 ```
 
 3. **Mock Interview - Generate Question**
+
 ```
 POST /generate-interview-question
 Content-Type: application/json
@@ -333,6 +338,7 @@ Response:
 ```
 
 4. **Mock Interview - Evaluate Answer**
+
 ```
 POST /evaluate-interview-answer
 Content-Type: application/json
@@ -357,25 +363,27 @@ Response:
 
 **Dependencies:**
 
-- FastAPI
+- FastAPI (Web framework)
 - Uvicorn (ASGI server)
 - google-generativeai (Gemini SDK)
-- python-dotenv
-- PyPDF2
-- python-multipart
+- python-dotenv (Environment variables)
+- PyPDF2 (PDF text extraction)
+- python-multipart (File upload handling)
 
 **Setup:**
 
 ```bash
 cd backend
 pip install -r requirements.txt
-python main.py
+python main.py  # Local development
+# Or deploy to Vercel using vercel.json configuration
 ```
 
 **CORS Configuration:**
 
-- Allows origins: `http://localhost:5173`, `http://localhost:3000`
-- Allows credentials, all methods, and headers
+- Allows all origins (`*`) for maximum compatibility
+- Supports all HTTP methods (GET, POST, PUT, DELETE, PATCH, OPTIONS)
+- Configured for both local development and production deployment
 
 ---
 
@@ -393,6 +401,8 @@ python main.py
 | **Lucide React**     | Latest  | Icon library              |
 | **React Hot Toast**  | 2.x     | Notifications             |
 | **TailwindCSS**      | 3.x     | Utility-first CSS         |
+| **React Markdown**   | Latest  | Markdown rendering        |
+| **Remark GFM**       | Latest  | GitHub Flavored Markdown  |
 
 ### Backend
 
@@ -440,7 +450,9 @@ IIUC_25_Version2.0/
 │   │   │   ├── Jobs.jsx              # Job listings with match scores
 │   │   │   ├── Profile.jsx           # User profile management
 │   │   │   ├── CareerRoadmap.jsx    # AI-powered career roadmap
-│   │   │   ├── Chatassistance.jsx   # AI chatbot
+│   │   │   ├── Chatassistance.jsx   # AI chatbot with markdown support
+│   │   │   ├── MockInterview.jsx    # AI-powered mock interview system
+│   │   │   ├── CvUpload.jsx         # CV analysis and skill extraction
 │   │   │   ├── LearningResources.jsx # Full learning resources page
 │   │   │   └── AdminPanel.jsx        # Admin dashboard
 │   │   ├── contexts/
@@ -462,7 +474,12 @@ IIUC_25_Version2.0/
 │   └── vite.config.js                # Vite build configuration
 │
 ├── backend/                          # Python FastAPI backend
-│   ├── main.py                       # FastAPI application with chat endpoint
+│   ├── main.py                       # FastAPI application with all endpoints
+│   │                                 # - /chat (Career chatbot)
+│   │                                 # - /summarize-cv (CV analysis)
+│   │                                 # - /generate-interview-question
+│   │                                 # - /evaluate-interview-answer
+│   ├── vercel.json                   # Vercel deployment configuration
 │   ├── .env                          # Backend environment variables
 │   └── requirements.txt              # Python dependencies
 │

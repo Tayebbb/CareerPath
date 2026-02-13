@@ -46,14 +46,6 @@ const Footer = () => {
             <p className="text-muted text-sm">
               Empowering youth with career opportunities and personalized learning paths aligned with SDG 8.
             </p>
-            <a
-              href="https://careerpathhh.netlify.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block mt-2 px-3 py-1 bg-gradient-to-br from-[#A855F7] to-[#7C3AED] text-white rounded-lg text-xs font-semibold shadow hover:shadow-neon-glow transition-all"
-            >
-              🌐 Live Preview
-            </a>
             <div className="flex space-x-3">
               {socialLinks.map((social) => (
                 <a

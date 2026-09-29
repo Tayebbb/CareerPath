@@ -5,10 +5,10 @@ yarn-debug.log*
 yarn-error.log*
 
 # Environment variables
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env
+.env.*
+!.env.example
+
 
 # Production builds
 /frontend/dist

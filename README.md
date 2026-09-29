@@ -181,10 +181,10 @@ POST https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:gene
 
 ```javascript
 // Backend (.env)
-GEMINI_API_KEY = AIzaSyCocHsm5Efg84WIiEyNh_DkVkiAbbV5JC8;
+GEMINI_API_KEY = YOUR_GEMINI_API_KEY;
 
 // Frontend (.env)
-VITE_GEMINI_API_KEY = AIzaSyCocHsm5Efg84WIiEyNh_DkVkiAbbV5JC8;
+VITE_GEMINI_API_KEY = YOUR_GEMINI_API_KEY;
 ```
 
 **Features Used:**
@@ -534,7 +534,7 @@ pip install -r requirements.txt
 # Create .env file
 # Copy and rename .env.example to .env
 # Add your Gemini API key:
-echo "GEMINI_API_KEY=AIzaSyCocHsm5Efg84WIiEyNh_DkVkiAbbV5JC8" > .env
+echo "GEMINI_API_KEY=YOUR_GEMINI_API_KEY" > .env
 
 # Start the backend server
 python main.py
@@ -571,15 +571,15 @@ npm install
 
 ```bash
 # Firebase Configuration
-VITE_FIREBASE_API_KEY=AIzaSyC8za3ZI4m9gUrYsueUum907vpuKzV8H0Q
-VITE_FIREBASE_AUTH_DOMAIN=iiuc25.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=iiuc25
-VITE_FIREBASE_STORAGE_BUCKET=iiuc25.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=75690391713
-VITE_FIREBASE_APP_ID=1:75690391713:web:4c72c5316547c8bc68d8e0
+VITE_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
 
 # Google Gemini API Key (for frontend AI features)
-VITE_GEMINI_API_KEY=AIzaSyCocHsm5Efg84WIiEyNh_DkVkiAbbV5JC8
+VITE_GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 
 # Backend API URL
 VITE_API_URL=http://localhost:8000
@@ -665,22 +665,22 @@ service cloud.firestore {
 ### Backend (.env)
 
 ```bash
-GEMINI_API_KEY=AIzaSyCocHsm5Efg84WIiEyNh_DkVkiAbbV5JC8
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 ```
 
 ### Frontend (.env)
 
 ```bash
 # Firebase Configuration (get from Firebase Console)
-VITE_FIREBASE_API_KEY=AIzaSyC8za3ZI4m9gUrYsueUum907vpuKzV8H0Q
-VITE_FIREBASE_AUTH_DOMAIN=iiuc25.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=iiuc25
-VITE_FIREBASE_STORAGE_BUCKET=iiuc25.firebasestorage.app
-VITE_FIREBASE_MESSAGING_SENDER_ID=75690391713
-VITE_FIREBASE_APP_ID=1:75690391713:web:4c72c5316547c8bc68d8e0
+VITE_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
 
 # Google Gemini API Key
-VITE_GEMINI_API_KEY=AIzaSyCocHsm5Efg84WIiEyNh_DkVkiAbbV5JC8
+VITE_GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 
 # Backend API URL
 VITE_API_URL=http://localhost:8000
